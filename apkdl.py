@@ -63,7 +63,7 @@ def process_file(file):
 
 def main():
     # colored input instead
-    cprint("Enter the names of the apps you want to download, separated by comma.", "green", attrs=["bold"], end=" ")``
+    cprint("Enter the names of the apps you want to download, separated by comma.", "green", attrs=["bold"], end=" ")
     apps = input().split(",")
     apps = [app.strip() for app in apps]
 
