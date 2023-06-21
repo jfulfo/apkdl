@@ -1,9 +1,11 @@
 import os
 import sys
 import subprocess
+import threading
 import json
 import concurrent.futures
 from termcolor import cprint
+from time import sleep
 
 # configuration
 STIGMA_PATH = "./Stigma.py"
@@ -61,6 +63,27 @@ def process_file(file):
     subprocess.run(["mv", f"Modified_{file.strip()}", f"{MODIFIED_APK_PATH}"])
 
 
+def start_emulator():
+    subprocess.run(["emulator", "-avd", "stigma"])
+
+def start_logcat():
+    subprocess.run(["adb", "logcat", "|", "grep", "\"Stigma\|stigma\"", ">>", "logcat.log"])
+
+def emulate(file):
+    cprint(f"Emulating {file.strip()}...", "cyan", attrs=["bold"])
+    emulator_thread = threading.Thread(target=start_emulator)
+    emulator_thread.start()
+    cprint("Waiting for emulator to boot...", "cyan", attrs=["bold"])
+    sleep(30)
+    logcat_thread = threading.Thread(target=start_logcat)
+    logcat_thread.start()
+    subprocess.run(["adb", "install", f"{MODIFIED_APK_PATH}/Modified_{file.strip()}", ">>", "install.log"], check=True)
+    subprocess.run(["adb", "shell", "monkey", "-p", f"{file.strip()[:-4]}", "-c", "android.intent.category.LAUNCHER", "1"], check=True)
+    sleep(60)
+    emulator_thread.kill()
+    logcat_thread.kill()
+
+
 def main():
     # colored input instead
     cprint("Enter the names of the apps you want to download, separated by comma.", "green", attrs=["bold"], end=" ")
@@ -80,6 +103,15 @@ def main():
     # create a ProcessPoolExecutor (for parallel processing)
     with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
         executor.map(process_file, files)
+
+    # check if "stigma" avd exists with avdmanager
+    if "stigma" not in subprocess.check_output(["avdmanager", "list", "avd"], text=True):
+        cprint("Creating stigma avd...", "cyan", attrs=["bold"])
+        subprocess.run(["sdkmanager", "system-images;android-29;google_apis;x86"], check=True])
+        subprocess.run(["avdmanager", "create", "avd", "-n", "stigma", "-k", "system-images;android-29;google_apis;x86", "-d", "pixel_3"], check=True)
+
+    for file in files:
+        emulate(file)
 
 if __name__ == "__main__":
     main()
