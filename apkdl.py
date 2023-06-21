@@ -86,14 +86,14 @@ def emulate(file):
 
 def main():
     # colored input instead
-    cprint("Enter the names of the apps you want to download, separated by comma.", "green", attrs=["bold"], end=" ")
+    cprint("Enter the names of the apps you want to download, separated by comma:", "green", attrs=["bold"], end=" ")
     apps = input().split(",")
     apps = [app.strip() for app in apps]
 
     if not os.path.exists(f"{APK_PATH}"):
         subprocess.run(["mkdir", f"{APK_PATH}"])
 
-    if not.os.path.exists(f"{MODIFIED_APK_PATH}")
+    if not os.path.exists(f"{MODIFIED_APK_PATH}"):
         subprocess.run(["mkdir", f"MODIFIED_APK_PATH"])
 
     download_files(apps)
