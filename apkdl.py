@@ -107,7 +107,7 @@ def main():
     # check if "stigma" avd exists with avdmanager
     if "stigma" not in subprocess.check_output(["avdmanager", "list", "avd"], text=True):
         cprint("Creating stigma avd...", "cyan", attrs=["bold"])
-        subprocess.run(["sdkmanager", "system-images;android-29;google_apis;x86"], check=True])
+        subprocess.run(["sdkmanager", "system-images;android-29;google_apis;x86"], check=True)
         subprocess.run(["avdmanager", "create", "avd", "-n", "stigma", "-k", "system-images;android-29;google_apis;x86", "-d", "pixel_3"], check=True)
 
     for file in files:
