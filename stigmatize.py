@@ -16,12 +16,7 @@ from termcolor import cprint
 from time import sleep
 
 # configuration
-try:
-    ANDROID_HOME = os.environ["ANDROID_HOME"]
-except KeyError:
-    cprint("ANDROID_HOME environment variable not set!", "red", attrs=["bold"])
-    cprint("Input path to Android SDK (e.g. '~/Android/Sdk'): ", "yellow", attrs=["bold"], end="")
-    ANDROID_HOME = input()
+ANDROID_HOME = ""
 STIGMA_PATH = "./Stigma.py"
 APK_PATH = "./apks"
 MODIFIED_APK_PATH = "./modified"
@@ -55,7 +50,7 @@ def app_exists(app_id):
 
 def extract_xapk(app_id):
     if os.path.exists(f"{APK_PATH}/{app_id}.xapk"):
-        cprint(f"XAPK detected for {app_id}!", "yellow", attrs=["bold"])
+        cprint(f"XAPK detected for {app_id}", "yellow", attrs=["bold"])
         cprint("Extracting...", "green", attrs=["bold"])
         subprocess.run(["unzip", f"{APK_PATH}/{app_id}.xapk", "-d", f"{APK_PATH}/{app_id}"], check=True)
         subprocess.run(["mv", "-v", f"{APK_PATH}/{app_id}/{app_id}.apk", f"{APK_PATH}/{app_id}.apk"], check=True)
@@ -81,7 +76,7 @@ def download_apk(app):
     # check if xapk file
     extract_xapk(app_id)
 
-    cprint(f"Done downloading {app}!", "green", attrs=["bold"])
+    cprint(f"Done downloading {app}", "green", attrs=["bold"])
 
 # delete apks in apk directory
 def delete_apks():
@@ -93,7 +88,6 @@ def delete_apks():
 
 # process apk with Stigma
 def process_apk(apk):
-    apk = apk.strip()
     cprint(f"Stigmatizing {apk}...", "green", attrs=["bold"])
     try:
         if DEBUG: # nothing suppressed
@@ -102,10 +96,10 @@ def process_apk(apk):
             subprocess.run(f"echo '\\n' | python3 {STIGMA_PATH} {APK_PATH}/{apk}", stdout=open(f"stigma_{apk}.log", w), shell=True, check=True)
 
         subprocess.run(["mv", f"Modified_{apk}", f"{MODIFIED_APK_PATH}"])
-        cprint(f"\nStigmatized {apk}!", "green", attrs=["bold"])
+        cprint(f"\nStigmatized {apk}", "green", attrs=["bold"])
         return True
     except CalledProcessError as e:
-        cprint(f"Error processing {apk}!", "red", attrs=["bold"])
+        cprint(f"Error processing {apk}", "red", attrs=["bold"])
         cprint(e.output, "red", attrs=["bold"])
         return False
 
@@ -136,7 +130,6 @@ def start_logcat():
 
 # launch emulator and logcat threads
 def emulate(apk):
-    apk = apk.strip()
     cprint(f"Emulating {apk}...", "green", attrs=["bold"])
     emulator_process = Process(target=start_emulator)
     emulator_process.start()
@@ -154,14 +147,14 @@ def emulate(apk):
     try:
         subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "install", "-r", f"{MODIFIED_APK_PATH}/{apk}"], check=True)
     except CalledProcessError as e:
-        cprint(f"Error installing {apk}!", "red", attrs=["bold"])
+        cprint(f"Error installing {apk}", "red", attrs=["bold"])
         cprint(e.output, "red", attrs=["bold"])
         emulator_process.terminate()
         logcat_process.terminate()
         ask_continue()
         return
 
-    cprint(f"Installed {apk}!", "green", attrs=["bold"])
+    cprint(f"Installed {apk}", "green", attrs=["bold"])
     cprint(f"Launching {apk}...", "green", attrs=["bold"])
     subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "shell", "monkey", "-p", f"{apk[:-4]}", "-c", "android.intent.category.LAUNCHER", "1"], check=True)
 
@@ -171,9 +164,27 @@ def emulate(apk):
     logcat_process.terminate()
 
 def main():
-    cprint("Enter the names of the apps you want to download, separated by comma:", "green", attrs=["bold"], end=" ")
-    apps = input().split(",")
-    apps = [app.strip() for app in apps]
+    # check if ANDROID_HOME is set
+    try:
+        ANDROID_HOME = os.environ["ANDROID_HOME"]
+    except KeyError:
+        cprint("ANDROID_HOME environment variable not set", "red", attrs=["bold"])
+        cprint("Input path to Android SDK (e.g. '~/Android/Sdk'): ", "yellow", attrs=["bold"], end="")
+        ANDROID_HOME = input()
+        if ANDROID_HOME == "":
+            cprint("Defaulting to '~/Android/Sdk'", "green", attrs=["bold"])
+            ANDROID_HOME = "~/Android/Sdk"
+        else:
+            cprint(f"Using {ANDROID_HOME}", "green", attrs=["bold"])
+
+    # set apps
+    if len(sys.argv) > 1:
+        cprint("Using command line arguments as app list", "green", attrs=["bold"])
+        apps = sys.argv[1:]
+    else:
+        cprint("Enter the names of the apps you want to download, separated by comma:", "green", attrs=["bold"], end=" ")
+        apps = input().split(",")
+        apps = [app.strip() for app in apps]
 
     if not os.path.exists(f"{APK_PATH}"):
         subprocess.run(["mkdir", f"{APK_PATH}"])
@@ -207,7 +218,7 @@ def main():
         cprint(e, "red", attrs=["bold"])
 
     delete_apks()
-    cprint("Done!", "green", attrs=["bold"])
+    cprint("Done", "green", attrs=["bold"])
 
 if __name__ == "__main__":
     main()
