@@ -16,7 +16,12 @@ from termcolor import cprint
 from time import sleep
 
 # configuration
-ANDROID_HOME = os.environ["ANDROID_HOME"]
+try:
+    ANDROID_HOME = os.environ["ANDROID_HOME"]
+except KeyError:
+    cprint("ANDROID_HOME environment variable not set!", "red", attrs=["bold"])
+    cprint("Input path to Android SDK (e.g. '~/Android/Sdk'): ", "yellow", attrs=["bold"], end="")
+    ANDROID_HOME = input()
 STIGMA_PATH = "./Stigma.py"
 APK_PATH = "./apks"
 MODIFIED_APK_PATH = "./modified"
