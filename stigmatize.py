@@ -16,7 +16,6 @@ from termcolor import cprint
 from time import sleep
 
 # configuration
-ANDROID_HOME = ""
 STIGMA_PATH = "./Stigma.py"
 APK_PATH = "./apks"
 MODIFIED_APK_PATH = "./modified"
@@ -41,8 +40,8 @@ def get_app_id(query):
 
 # checks if app already exists in apk directory
 def app_exists(app_id):
-    if app_id in subprocess.check_output(["ls", f"{APK_PATH}"], text=True):
-        cprint(f"{app_id} already exists in {APK_PATH}", "yellow", attrs=["bold"])
+    if app_id in subprocess.check_output(["ls", f"{APK_PATH}"], text=True) or app_id in subprocess.check_output(["ls", f"{MODIFIED_APK_PATH}"], text=True):
+        cprint(f"{app_id} already exists in {APK_PATH} or {MODIFIED_APK_PATH}", "yellow", attrs=["bold"])
         cprint("Skipping download...", "yellow", attrs=["bold"])
         return True
     else:
@@ -78,17 +77,32 @@ def download_apk(app):
 
     cprint(f"Done downloading {app}", "green", attrs=["bold"])
 
-# delete apks in apk directory
+# delete apks
 def delete_apks():
     cprint("Would you like to delete the downloaded apks? (Y/n)", "yellow", attrs=["bold"], end=" ")
     answer = input().lower()
     if answer == "y" or answer == "":
-        cprint("Deleting apks...", "green", attrs=["bold"])
+        cprint("Deleting downloaded apks...", "green", attrs=["bold"])
         subprocess.run([f"rm -rf {APK_PATH}/*"], shell=True, check=True)
+    cprint("Would you like to delete the modified apks? (Y/n)", "yellow", attrs=["bold"], end=" ")
+    answer = input().lower()
+    if answer == "y" or answer == "":
+        cprint("Deleting modified apks...", "green", attrs=["bold"])
+        subprocess.run([f"rm -rf {MODIFIED_APK_PATH}/*"], shell=True, check=True)
 
 # process apk with Stigma
 def process_apk(apk):
     cprint(f"Stigmatizing {apk}...", "green", attrs=["bold"])
+
+    if not os.path.exists(f"{APK_PATH}/{apk}"):
+        cprint(f"{apk} does not exist in {APK_PATH}", "red", attrs=["bold"])
+        return False
+
+    if os.path.exists(f"{MODIFIED_APK_PATH}/Modified_{apk}"):
+        cprint(f"Modified_{apk} already exists in {MODIFIED_APK_PATH}", "yellow", attrs=["bold"])
+        cprint("Skipping...", "yellow", attrs=["bold"])
+        return True
+
     try:
         if DEBUG: # nothing suppressed
             subprocess.run(f"echo '\\n' | python3 {STIGMA_PATH} {APK_PATH}/{apk}", shell=True, check=True)
@@ -117,16 +131,16 @@ def wait_for_emulator():
 
 def start_emulator():
     if DEBUG:
-        subprocess.run([f"{ANDROID_HOME}/emulator/emulator", "-avd", "stigma"], check=True)
+        subprocess.run([f"{ANDROID_HOME}/emulator/emulator", "-avd", "stigma"])
     else:
-        subprocess.run([f"{ANDROID_HOME}/emulator/emulator", "-avd", "stigma"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([f"{ANDROID_HOME}/emulator/emulator", "-avd", "stigma"], stdout=subprocess.DEVNULL)
 
 # logcat thread filtered by "stigma"
 def start_logcat():
     if DEBUG:
         subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "logcat", "stigma:*", "Stigma:*", "*:S"])
     else:
-        subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "logcat", "stigma:*", "Stigma:*", "*:S"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "logcat", "stigma:*", "Stigma:*", "*:S"], stdout=subprocess.DEVNULL)
 
 # launch emulator and logcat threads
 def emulate(apk):
@@ -134,11 +148,11 @@ def emulate(apk):
     emulator_process = Process(target=start_emulator)
     emulator_process.start()
     cprint("Waiting for emulator to boot...", "yellow", attrs=["bold"])
-    sleep(5)
-    if not wait_for_emulator():
-        emulator_process.terminate()
-        ask_continue()
-        return
+    sleep(20)
+    #if not wait_for_emulator():
+    #    emulator_process.terminate()
+    #    ask_continue()
+    #    return
     logcat_process = Process(target=start_logcat)
     logcat_process.start()
 
@@ -156,7 +170,16 @@ def emulate(apk):
 
     cprint(f"Installed {apk}", "green", attrs=["bold"])
     cprint(f"Launching {apk}...", "green", attrs=["bold"])
-    subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "shell", "monkey", "-p", f"{apk[:-4]}", "-c", "android.intent.category.LAUNCHER", "1"], check=True)
+
+    try:
+        subprocess.run([f"{ANDROID_HOME}/platform-tools/adb", "shell", "monkey", "-p", f"{apk[:-4]}", "-c", "android.intent.category.LAUNCHER", "1"], check=True)
+    except CalledProcessError as e:
+        cprint(f"Error launching {apk}", "red", attrs=["bold"])
+        cprint(e.output, "red", attrs=["bold"])
+        emulator_process.terminate()
+        logcat_process.terminate()
+        ask_continue()
+        return
 
     cprint(f"Emulating {apk} for 30 seconds...", "green", attrs=["bold"])
     sleep(30)
@@ -165,6 +188,7 @@ def emulate(apk):
 
 def main():
     # check if ANDROID_HOME is set
+    global ANDROID_HOME
     try:
         ANDROID_HOME = os.environ["ANDROID_HOME"]
     except KeyError:
@@ -176,6 +200,7 @@ def main():
             ANDROID_HOME = "~/Android/Sdk"
         else:
             cprint(f"Using {ANDROID_HOME}", "green", attrs=["bold"])
+
 
     # set apps
     if len(sys.argv) > 1:
@@ -219,6 +244,7 @@ def main():
 
     delete_apks()
     cprint("Done", "green", attrs=["bold"])
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
